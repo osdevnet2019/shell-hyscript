@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <jmorecfg.h>
 #include <string.h>
+#include <zconf.h>
+#include <wait.h>
 
 size_t BUFSIZE = 1024; // be careful with this variable before changing its value
 
@@ -16,7 +18,7 @@ int skipping_esccapes(char *line, int i_line)
 }
 
 
-char *read()
+char *read_input()
 {
     
     char *buffer = malloc(BUFSIZE * sizeof(char));
@@ -27,7 +29,6 @@ char *read()
         exit(1);
     }
 
-    printf( "Enter a value :");
     getline(&buffer,&BUFSIZE,stdin);
 
     return buffer;
@@ -75,7 +76,7 @@ char **parse(char * line)
 
         }
 
-        char h = line[i_line];
+       // char h = line[i_line];
 
         i_line++;
 
@@ -105,7 +106,27 @@ char **parse(char * line)
 int execute(char ** args)
 {
 
-    return 0;
+    pid_t pid, wpid;
+    int status;
+
+    pid = fork();
+    if (pid == 0) {
+        // Child process
+        if (execvp(args[0], args) == -1) {
+            perror("lsh");
+        }
+        exit(EXIT_FAILURE);
+    } else if (pid < 0) {
+        // Error forking
+        perror("lsh");
+    } else {
+        // Parent process
+        do {
+            wpid = waitpid(pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    }
+
+    return 1;
 }
 
 
@@ -125,7 +146,7 @@ void run(void)
     do
     {
         printf("%s","supperBug@root > ");
-        line = read();
+        line = read_input();
         args = parse(line);
         status = execute(args);
         free(line);
@@ -144,7 +165,7 @@ int main(int argc, char** argv)
      * cleanup the program
      * */
 
-   parse( read());
+    run();
 
     printf("Hello, World!\n");
     return 0;
