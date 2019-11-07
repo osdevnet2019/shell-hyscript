@@ -3,4 +3,4 @@ project(shell-hyscript C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(shell-hyscript bug.c)
+add_executable(shell-hyscript bug_shell.c)
