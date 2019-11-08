@@ -147,7 +147,7 @@ struct pairs parse(char * line, char * argss[])
     }
     free(args);
     struct pairs p;
-    argss[i_args][++j_args] = '\0';
+    argss[i_args][++j_args] = 0;
     p.i = i_args;
     p.j = j_args;
     return p;
@@ -190,7 +190,7 @@ int execute(char * args[])
     }
     else if (pid == 0){
 
-        int o = execvp(args[0],args);
+        int o = execvp(ar[0],ar);
 
 
     }
@@ -248,7 +248,8 @@ void run(void)
     do
     {
         char *p = getenv("ls");
-        printf("%s",p);
+
+
         you_are_here(getuid());
         line = read_input();
 
@@ -297,6 +298,5 @@ int main(int argc, char** argv)
 
     run();
 
-    printf("Hello, World!\n");
     return 0;
 }
