@@ -24,6 +24,7 @@ const char *getUserName()
 }
 
 
+
 void you_are_here(uid_t usr_type) {
 
     char cwd[2048];
@@ -83,6 +84,80 @@ int skipping_esccapes(char *line, int i_line)
     return i_line;
 }
 
+struct pairs
+{
+    int i;
+    int j;
+};
+
+struct pairs parse(char * line, char * argss[])
+{
+    //alocation of arguments array
+    char **args = (char **)malloc(BUFSIZE * sizeof(char *));
+
+    for (int i=0; i<BUFSIZE; i++)
+    {
+        args[i] = (char *) malloc(BUFSIZE * sizeof(char));
+
+    }
+
+
+    int i_line = 0;
+
+    //indecies of arguments
+    int i_args = 0;
+    int j_args = 0;
+    do
+    {
+        if ((int)line[i_line] == 32)
+        {
+            i_args++;
+            i_line = skipping_esccapes(line, i_line);
+            j_args=0;
+            args[i_args][j_args++] = line[i_line];
+
+
+        } else
+        {
+            args[i_args][j_args] = line[i_line];
+            j_args++;
+
+
+        }
+
+       char h = line[i_line];
+
+        i_line++;
+
+    }
+    while (line[i_line] != 0);
+    boolean isOver=FALSE;
+    for (int i = 0; i <= i_args; i++)
+    {
+        for (int j = 0; j < j_args; j++)
+        {
+            if (isOver)
+                argss[i][j]= 0;
+            if (args[i][j]=='\n')
+                isOver = TRUE;
+            else
+               argss[i][j] = args[i][j];
+
+        }
+    }
+    free(args);
+    struct pairs p;
+    argss[i_args][++j_args] = '\0';
+    p.i = i_args;
+    p.j = j_args;
+    return p;
+}
+
+
+
+
+
+
 
 char *read_input()
 {
@@ -105,7 +180,7 @@ int execute(char * args[])
 
     pid_t pid, wpid;
     int status;
-
+    char *ar[] ={"ls","-l",NULL};
     pid = fork();
     if (pid == -1){
 
@@ -115,8 +190,7 @@ int execute(char * args[])
     }
     else if (pid == 0){
 
-        char * ls_args[] = {"ls","-1", NULL};
-        int o = execvp(ls_args[0],ls_args);
+        int o = execvp(args[0],args);
 
 
     }
@@ -180,21 +254,31 @@ void run(void)
 
 
         int size = 0;
-
+        //for path determination, replacing home with ~
         for (int i = 0; i < 1000000; ++i)
         {
 
-            if (line[i]==10)
+            if (line[i]==10) // 10 = /n
                 break;
             size ++;
         }
+
         char * arguments [++size];
         for (int j = 0; j < size; ++j)
             arguments[j] = &line[j];
         arguments[--size] = NULL;
 
+        char  *args [1000];
+
+        for (int i=0; i<1000; i++)
+        {
+            args[i] = (char *) alloca(1000 * sizeof(char));
+
+        }
+
+        struct pairs pp = parse(line,args);
         //set follow-fork-mode child set detach-on-fork off
-        status = execute(arguments);
+        status = execute(args);
         free(line);
     }
     while (status >=0);
