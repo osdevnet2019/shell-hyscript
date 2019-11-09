@@ -33,7 +33,7 @@ void you_are_here(uid_t usr_type) {
     char updated_path [2048];
     //chdir("/path/to/change/directory/to");
     getcwd(cwd, sizeof(cwd));
-    boolean l = TRUE;
+    boolean is_home_on_path = TRUE;
     int username_length = 7; // to fix username count
     for (int i = 0; i < 2048; ++i)
     {
@@ -47,11 +47,11 @@ void you_are_here(uid_t usr_type) {
 
         else if(i < 6 && home_pattern[i] != cwd[i])
         {
-            l = FALSE;
+            is_home_on_path = FALSE;
         }
     }
 
-    if (l == TRUE)
+    if (is_home_on_path == TRUE)
     {
         updated_path[0] = '~';
         for (int j = 0; j < 2048; ++j)
@@ -75,7 +75,7 @@ void you_are_here(uid_t usr_type) {
 
 
 
-int skipping_esccapes(char *line, int i_line)
+int skipping_esccapes(const char *line, int i_line)
 {
        while (line[i_line]==' ')
         {
@@ -83,80 +83,6 @@ int skipping_esccapes(char *line, int i_line)
         }
     return i_line;
 }
-
-struct pairs
-{
-    int i;
-    int j;
-};
-
-struct pairs parse(char * line, char * argss[])
-{
-    //alocation of arguments array
-    char **args = (char **)malloc(BUFSIZE * sizeof(char *));
-
-    for (int i=0; i<BUFSIZE; i++)
-    {
-        args[i] = (char *) malloc(BUFSIZE * sizeof(char));
-
-    }
-
-
-    int i_line = 0;
-
-    //indecies of arguments
-    int i_args = 0;
-    int j_args = 0;
-    do
-    {
-        if ((int)line[i_line] == 32)
-        {
-            i_args++;
-            i_line = skipping_esccapes(line, i_line);
-            j_args=0;
-            args[i_args][j_args++] = line[i_line];
-
-
-        } else
-        {
-            args[i_args][j_args] = line[i_line];
-            j_args++;
-
-
-        }
-
-       char h = line[i_line];
-
-        i_line++;
-
-    }
-    while (line[i_line] != 0);
-    boolean isOver=FALSE;
-    for (int i = 0; i <= i_args; i++)
-    {
-        for (int j = 0; j < j_args; j++)
-        {
-            if (isOver)
-                argss[i][j]= 0;
-            if (args[i][j]=='\n')
-                isOver = TRUE;
-            else
-               argss[i][j] = args[i][j];
-
-        }
-    }
-    free(args);
-    struct pairs p;
-    argss[i_args][++j_args] = 0;
-    p.i = i_args;
-    p.j = j_args;
-    return p;
-}
-
-
-
-
-
 
 
 char *read_input()
@@ -178,9 +104,8 @@ char *read_input()
 int execute(char * args[])
 {
 
-    pid_t pid, wpid;
+    pid_t pid;
     int status;
-    char *ar[] ={"ls","-l",NULL};
     pid = fork();
     if (pid == -1){
 
@@ -190,7 +115,7 @@ int execute(char * args[])
     }
     else if (pid == 0){
 
-        int o = execvp(ar[0],ar);
+        execvp(args[0],args);
 
 
     }
@@ -199,7 +124,7 @@ int execute(char * args[])
         // parent process
         // getppid() returns process id of parent of
         // calling process
-        printf("parent process, pid = %u\n",getppid());
+
 
         // the parent process calls waitpid() on the child
         // waitpid() system call suspends execution of
@@ -207,18 +132,23 @@ int execute(char * args[])
         // argument has changed state
         // see wait() man page for all the flags or options
         // used here
-        if (waitpid(pid, &status, 0) > 0) {
+        if (waitpid(pid, &status, 0) > 0)
+        {
 
-            if (WIFEXITED(status) && !WEXITSTATUS(status))
-                printf("program execution successfull\n");
+            if (WIFEXITED(status) && !WEXITSTATUS(status))// NOLINT(hicpp-signed-bitwise)
+                printf(" ");
 
-            else if (WIFEXITED(status) && WEXITSTATUS(status)) {
-                if (WEXITSTATUS(status) == 127) {
+            else if (WIFEXITED(status) && WEXITSTATUS(status))  // NOLINT(hicpp-signed-bitwise)
+            {
 
-                    // execv failed
-                    printf("execv failed\n");
-                }
-                else
+                    if (WEXITSTATUS(status) == 127)// NOLINT(hicpp-signed-bitwise)
+                    {
+
+                        // execv failed
+                        printf("execv failed\n");
+                    }
+
+                    else
                     printf("program terminated normally,"
                            " but returned a non-zero status\n");
             }
@@ -226,12 +156,83 @@ int execute(char * args[])
                 printf("program didn't terminate normally\n");
         }
         else {
-            // waitpid() failed
+
             printf("waitpid() failed\n");
         }
 
     }
 
+}
+
+
+//counting the length of string
+int lenstr(const char * arr)
+{
+    int i = 0;
+    char stop = '\000';
+    while (1)
+    {
+        if (arr[i] == stop)
+            return i;
+        i++;
+    }
+
+    exit(0); //can't figure out why but after returning i program continue to execution
+             //this is temporary solution
+}
+
+//string concatination
+char * concatstr(const char *a, const char *b, int a_size, int b_size)
+{
+
+    int i_a = 0;
+
+    int c_size = a_size + b_size;
+
+    char * c =( char *)  malloc( c_size*sizeof(char));
+
+    for (i_a = 0; i_a < a_size; ++i_a)
+        c[i_a] = a[i_a];
+
+    for (int j = 0; j < b_size; ++j)
+        c[i_a++] = b[j];
+
+    return c;
+}
+
+void parse(char * line, char  * args[])
+{
+    int i_line = 0;
+    int i_args = 0;
+    int i_tmp_str = 0;
+
+    char *tmp_str=(char *) malloc(BUFSIZE * sizeof(char));
+
+    while (1)
+    {
+        if (line[i_line] == '\n')
+        {
+            int tmp_str_size = lenstr(tmp_str);
+            args[i_args] = concatstr( args[i_args], tmp_str, 0, tmp_str_size);
+            break;
+        }
+
+        if(line[i_line] == 32) //the 32 is 'space' code
+        {
+            //1 will be added in the end of the while loop
+            //-1 is assure us to get right index
+            i_line = skipping_esccapes(line, i_line);
+            i_tmp_str = 0;
+            int tmp_str_size = lenstr(tmp_str);
+            args[i_args] = concatstr(args[i_args],tmp_str,0, tmp_str_size);
+            i_args++;
+            free(tmp_str);
+            tmp_str=(char *) malloc(BUFSIZE * sizeof(char));
+
+        }
+
+        tmp_str[i_tmp_str++] = line [i_line++];
+    }
 }
 
 void run(void)
@@ -242,21 +243,18 @@ void run(void)
      * 3. Executing parsed commands
      * */
 
-    char * line;
-    int status;
+    char * line = 0;
+    int status = 0;
 
     do
     {
-        char *p = getenv("ls");
-
-
         you_are_here(getuid());
         line = read_input();
 
 
         int size = 0;
         //for path determination, replacing home with ~
-        for (int i = 0; i < 1000000; ++i)
+        for (int i = 0; i < BUFSIZE; ++i)
         {
 
             if (line[i]==10) // 10 = /n
@@ -264,20 +262,12 @@ void run(void)
             size ++;
         }
 
-        char * arguments [++size];
-        for (int j = 0; j < size; ++j)
-            arguments[j] = &line[j];
-        arguments[--size] = NULL;
+        char * args [BUFSIZE];
 
-        char  *args [1000];
+        for (int j = 0; j < BUFSIZE; ++j)
+            args[j] = 0;
 
-        for (int i=0; i<1000; i++)
-        {
-            args[i] = (char *) alloca(1000 * sizeof(char));
-
-        }
-
-        struct pairs pp = parse(line,args);
+        parse(line,args);
         //set follow-fork-mode child set detach-on-fork off
         status = execute(args);
         free(line);
@@ -287,15 +277,12 @@ void run(void)
 
 }
 
-
 int main(int argc, char** argv)
 {
     /* loading the configuration
      * run the program
      * cleanup the program
      * */
-
-
     run();
 
     return 0;
