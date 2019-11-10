@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <stdlib.h>
-#include <jmorecfg.h>
-#include <string.h>
-#include <zconf.h>
+#include <unistd.h>
 #include <wait.h>
 #include <pwd.h>
 
 size_t BUFSIZE = 1024; // be careful with this variable before changing its value
-
+int isInBackground = 0;
 
 
 const char *getUserName()
@@ -28,12 +26,11 @@ const char *getUserName()
 void you_are_here(uid_t usr_type) {
 
     char cwd[2048];
-    printf("%s", getUserName());
     char home_pattern[] = {"/home/"}; //size = 7
     char updated_path [2048];
     //chdir("/path/to/change/directory/to");
     getcwd(cwd, sizeof(cwd));
-    boolean is_home_on_path = TRUE;
+    int is_home_on_path = 1;
     int username_length = 7; // to fix username count
     for (int i = 0; i < 2048; ++i)
     {
@@ -47,11 +44,11 @@ void you_are_here(uid_t usr_type) {
 
         else if(i < 6 && home_pattern[i] != cwd[i])
         {
-            is_home_on_path = FALSE;
+            is_home_on_path = 0;
         }
     }
 
-    if (is_home_on_path == TRUE)
+    if (is_home_on_path == 1)
     {
         updated_path[0] = '~';
         for (int j = 0; j < 2048; ++j)
@@ -66,10 +63,10 @@ void you_are_here(uid_t usr_type) {
 
 
     if (usr_type == 0) {
-        printf("@bug_shell:%s# > ",updated_path);
+        printf("%s@bug_shell:%s# > ",getUserName(),updated_path);
     }
     else {
-        printf("@bug_shell:%s$ > ", updated_path);
+        printf("%s@bug_shell:%s$ > ",getUserName(),updated_path);
     }
 }
 
@@ -85,61 +82,53 @@ int skipping_esccapes(const char *line, int i_line)
 }
 
 
-char *read_input()
+void read_input(char *buffer)
 {
-    
-    char *buffer = malloc(BUFSIZE * sizeof(char));
-
     if (!buffer)
     {
         fprintf(stderr,"Allocation error");
         exit(1);
     }
-
     getline(&buffer,&BUFSIZE,stdin);
 
-    return buffer;
 }
 
+#pragma ide diagnostic ignored "hicpp-signed-bitwise"
 int execute(char * args[])
 {
 
-    pid_t pid;
-    int status;
-    pid = fork();
+    pid_t pid = fork();
+    int status = 0;
+
     if (pid == -1){
 
         // pid == -1 means error occured
         printf("can't fork, error occured\n");
         exit(EXIT_FAILURE);
     }
-    else if (pid == 0){
+    else if (pid == 0 && isInBackground == 0){
 
         execvp(args[0],args);
 
 
     }
-    else{
-        // a positive number is returned for the pid of
-        // parent process
-        // getppid() returns process id of parent of
-        // calling process
+    else if (pid == 0 && isInBackground == 1){
+        //don' do anything cz this is child process
+    } else
+    {
 
 
-        // the parent process calls waitpid() on the child
-        // waitpid() system call suspends execution of
-        // calling process until a child specified by pid
-        // argument has changed state
-        // see wait() man page for all the flags or options
-        // used here
-        if (waitpid(pid, &status, 0) > 0)
+        if (isInBackground == 0) {
+            if (waitpid(pid, &status, 0) < 1)
+                printf("waitpid() failed\n");
+        }
+        else
         {
-
-            if (WIFEXITED(status) && !WEXITSTATUS(status))// NOLINT(hicpp-signed-bitwise)
-                printf(" ");
-
-            else if (WIFEXITED(status) && WEXITSTATUS(status))  // NOLINT(hicpp-signed-bitwise)
+            if (waitpid(pid, &status, 0) > 0)
             {
+
+                if (WIFEXITED(status) && WEXITSTATUS(status))  // NOLINT(hicpp-signed-bitwise)
+                {
 
                     if (WEXITSTATUS(status) == 127)// NOLINT(hicpp-signed-bitwise)
                     {
@@ -149,20 +138,23 @@ int execute(char * args[])
                     }
 
                     else
-                    printf("program terminated normally,"
-                           " but returned a non-zero status\n");
+                        printf("program terminated normally,"
+                               " but returned a non-zero status\n");
+                }
+                else
+                    printf("program didn't terminate normally\n");
             }
-            else
-                printf("program didn't terminate normally\n");
-        }
-        else {
+            else {
 
-            printf("waitpid() failed\n");
+                printf("waitpid() failed\n");
+            }
         }
-
     }
+    isInBackground = 0; //resetting background process
+    return 1;
 
 }
+
 
 
 //counting the length of string
@@ -212,15 +204,15 @@ void parse(char * line, char  * args[])
     {
         if (line[i_line] == '\n')
         {
+            if(i_line > 0 && line[i_line-1] == 38)
+                isInBackground = 1;
             int tmp_str_size = lenstr(tmp_str);
             args[i_args] = concatstr( args[i_args], tmp_str, 0, tmp_str_size);
             break;
         }
 
-        if(line[i_line] == 32) //the 32 is 'space' code
+        if(line[i_line] == 32) //the 32 is a code of 'space'
         {
-            //1 will be added in the end of the while loop
-            //-1 is assure us to get right index
             i_line = skipping_esccapes(line, i_line);
             i_tmp_str = 0;
             int tmp_str_size = lenstr(tmp_str);
@@ -243,36 +235,35 @@ void run(void)
      * 3. Executing parsed commands
      * */
 
-    char * line = 0;
-    int status = 0;
-
-    do
+    int status = 1;
+    while (status > 0)
     {
         you_are_here(getuid());
-        line = read_input();
+        char *line = malloc(BUFSIZE * sizeof(char));
 
+        read_input(line);
+
+        char * args [BUFSIZE];
+        for (int j = 0; j < BUFSIZE; ++j)
+            args[j] = 0;
 
         int size = 0;
+
         //for path determination, replacing home with ~
         for (int i = 0; i < BUFSIZE; ++i)
         {
-
             if (line[i]==10) // 10 = /n
                 break;
             size ++;
         }
 
-        char * args [BUFSIZE];
-
-        for (int j = 0; j < BUFSIZE; ++j)
-            args[j] = 0;
-
         parse(line,args);
         //set follow-fork-mode child set detach-on-fork off
         status = execute(args);
-        free(line);
+        free(line);//0x7fff33941160
+
     }
-    while (status >=0);
+
 
 
 }
@@ -283,6 +274,7 @@ int main(int argc, char** argv)
      * run the program
      * cleanup the program
      * */
+
     run();
 
     return 0;
