@@ -199,9 +199,8 @@ void home_to_tilda() {
         if (size_cwd > 1)
         {
             char new_path [BUFSIZE];
-
             new_path[0] = '~';
-            new_path[1] = '/';
+            //new_path[1] = '/';
             int j = home_path_length;
             for (; j < 2048; ++j)
             {
@@ -281,11 +280,23 @@ void print_current_path()
 //change directory
 void cd(char *path)
 {
-   int status = chdir(path);
-   if(status > -1)
-       update_path(path);
-   else
-       printf("bug_shell: cd: %s: No such file or directory\n",path);
+    if(cmpstr(path,"~"))
+    {
+        path = "/home";
+        char * result = mergestr(path,getUserName());
+        path = result;
+        chdir(path);
+        cpstr(updated_path,"~");
+    }
+
+    else
+    {
+        int status = chdir(path);
+        if (status > -1)
+            update_path(path);
+        else
+            printf("bug_shell: cd: %s: No such file or directory\n", path);
+    }
 }
 
 
