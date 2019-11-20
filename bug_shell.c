@@ -58,19 +58,29 @@ void cpstr(char *to, char *from)
 {
     int to_size = lenstr(to);
     int from_size = lenstr(from);
+    int t = to_size + from_size;
 
-    for (int i = 0; i < to_size; ++i)
+    for (int i = 0; i < t; ++i)
     {
-        if(i < from_size)
-            to[i]=from[i];
+        if (i > from_size && i < to_size)
+        {
+            to[i]=0;
+        } else if(i > to_size && i > from_size)
+        {
+            break;
+        }
         else
-            to[i] = 0;
-    }
+                to[i] = from[i];
+
+        }
+
+
 
 }
 
 char * mergestr(char *to, char *from)
 {
+
     int a_size = lenstr(to);
     int b_size = lenstr(from);
     int total = a_size+b_size;
@@ -86,6 +96,10 @@ char * mergestr(char *to, char *from)
     {
         result[i+1]=from[i-a_size];
     }
+    if(result[total]!=from[b_size-1])
+        result[total]=0;
+    else
+        result[total+1]=0;
     return result;
 
 }
@@ -214,7 +228,11 @@ void update_path(char * update_the_path)
         if( cmpstr(update_the_path,".."))
         {
             int i = lenstr(updated_path);
-            if(!cmpstr(update_the_path,"~"))
+            if(cmpstr(updated_path,"~"))
+            {
+               cpstr(updated_path,"/home");
+            }
+            else
             {
                 for (; i >= 0; --i)
                 {
@@ -226,14 +244,14 @@ void update_path(char * update_the_path)
                         break;
                     }
                 }
-            } else
-                printf("bubu");
+            }
         }
 
         else if(update_the_path[0]!='~')
         {
             int s_a = lenstr(updated_path);
             int s_b = lenstr(update_the_path);
+
             char * result = mergestr(updated_path, update_the_path);
             cpstr(updated_path,result);
         }
