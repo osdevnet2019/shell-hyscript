@@ -9,6 +9,10 @@ size_t BUFSIZE = 1024; // be careful with this variable before changing its valu
 int isInBackground = 0;
 char updated_path [2048];
 
+/*=======================================================================================================
+ * implementation of default library functions
+ *=======================================================================================================
+ */
 //counting the length of string
 int lenstr(const char * arr)
 {
@@ -44,27 +48,46 @@ char * concatstr(const char *a, const char *b, int a_size, int b_size)
     return c;
 }
 
-void mergestr(char *to, char *from)
+static void handler(siginfo_t *si)
+{
+    printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
+    //exit(EXIT_FAILURE);
+}
+
+void cpstr(char *to, char *from)
+{
+    int to_size = lenstr(to);
+    int from_size = lenstr(from);
+
+    for (int i = 0; i < to_size; ++i)
+    {
+        if(i < from_size)
+            to[i]=from[i];
+        else
+            to[i] = 0;
+    }
+
+}
+
+char * mergestr(char *to, char *from)
 {
     int a_size = lenstr(to);
     int b_size = lenstr(from);
-    /*int untill = 0;
-    int start = 0;
+    int total = a_size+b_size;
 
-    if(a_size >=b_size)
+    char * result = (char *) alloca(a_size+b_size);
+    for (int j = 0; j <= a_size; ++j)
     {
-        if(a_size != b_size)
-            start = b_size;
-        untill = a_size;
+        result[j] = to[j];
     }
-    else
-    {
-        start = a_size;
-        untill = b_size;
-    }*/
+    result[a_size]='/';
 
-    for (int i = 0; i < b_size; ++i)
-        to[a_size++] = from[i];
+    for (int i = a_size; i < total; ++i)
+    {
+        result[i+1]=from[i-a_size];
+    }
+    return result;
+
 }
 
 
@@ -88,22 +111,27 @@ int cmpstr(char * a, char *b)
 }
 
 
-void cpstr(char *to, char *from)
+int skipping_esccapes(const char *line, int i_line)
 {
-    int to_size = lenstr(to);
-    int from_size = lenstr(from);
-
-    for (int i = 0; i < to_size; ++i)
+    while (line[i_line]==' ')
     {
-        if(i < from_size)
-            to[i]=from[i];
-        else
-            to[i] = 0;
+        i_line++;
     }
-
+    return i_line;
 }
+/*
+ * =================================================================================================================
+ * end of the library functions implementation
+ * ==================================================================================================================
+ */
 
-const char *getUserName()
+/*=================================================================================================================
+ * Shell starts here
+ *=================================================================================================================
+ */
+
+
+char *getUserName()
 {
     uid_t uid = geteuid();
     struct passwd *pw = getpwuid(uid);
@@ -115,29 +143,115 @@ const char *getUserName()
     return "";
 }
 
-
-void update_path()
+char * get_home_string()
 {
+    char * username = getUserName();
+    char * home_pattern = "/home";
+
+    return mergestr(home_pattern, username);
+}
+
+
+int get_home_path_length()
+{
+    int home_path_length = lenstr(get_home_string()); // home pattern size
+    return home_path_length;
+}
+
+
+int is_home_on_path()
+{
+    int is_home_on_path = 1;
+    int home_path_length = get_home_path_length();
+    char *home_pattern = get_home_string();
+
+    for (int i = 0; i < home_path_length; ++i)
+    {
+        if (home_pattern[i] != updated_path[i])
+            is_home_on_path = 0;
+    }
+    return is_home_on_path;
+}
+
+
+void home_to_tilda() {
+
+
+
+        //getcwd(updated_path, sizeof(updated_path));
+        int size_cwd = lenstr(updated_path);
+        int home_path_length = get_home_path_length(); // home pattern size
+
+        if (size_cwd > 1)
+        {
+            char new_path [BUFSIZE];
+
+            new_path[0] = '~';
+            new_path[1] = '/';
+            int j = home_path_length;
+            for (; j < 2048; ++j)
+            {
+
+                if (updated_path[j]==0)
+                    break;
+                if(j >= home_path_length)
+                    new_path[j-home_path_length+1] = updated_path[j];
+            }
+            cpstr(updated_path,new_path);
+        }
+
 
 }
 
 
-void print_path(char * update_the_path)
+//printing the current path
+void update_path(char * update_the_path)
 {
-    uid_t usr_type = getuid();
     if(update_the_path[0]=='/')
         cpstr(updated_path,update_the_path);
     else
     {
-        if(update_the_path[0]!='~')
+        if( cmpstr(update_the_path,".."))
+        {
+            int i = lenstr(updated_path);
+            if(!cmpstr(update_the_path,"~"))
+            {
+                for (; i >= 0; --i)
+                {
+                    if (updated_path[i] != '/')
+                        updated_path[i] = 0;
+                    else
+                    {
+                        updated_path[i] = 0;
+                        break;
+                    }
+                }
+            } else
+                printf("bubu");
+        }
+
+        else if(update_the_path[0]!='~')
         {
             int s_a = lenstr(updated_path);
             int s_b = lenstr(update_the_path);
-            mergestr(updated_path, update_the_path);
-            updated_path[s_a + s_b] = '/';
+            char * result = mergestr(updated_path, update_the_path);
+            cpstr(updated_path,result);
+        }
+        else
+        {
+            cpstr(updated_path, "/");
+            cpstr(updated_path,update_the_path);
         }
 
     }
+}
+
+void print_current_path()
+{
+    if(is_home_on_path())
+      home_to_tilda();
+
+    uid_t usr_type = getuid();
     if (usr_type == 0) {
         printf("%s@bug_shell:%s# > ",getUserName(),updated_path);
     }
@@ -146,73 +260,18 @@ void print_path(char * update_the_path)
     }
 }
 
-
-
-
+//change directory
 void cd(char *path)
 {
-    chdir(path);
-
-    print_path(path);
-
+   int status = chdir(path);
+   if(status > -1)
+       update_path(path);
+   else
+       printf("bug_shell: cd: %s: No such file or directory\n",path);
 }
 
 
-
-
-
-
-void you_are_here(uid_t usr_type) {
-
-    char cwd[2048];
-    char home_pattern[] = {"/home/"}; //size = 7
-
-    int size_cwd = lenstr(cwd);
-
-    getcwd(cwd, sizeof(cwd));
-    int is_home_on_path = 1;
-    int username_length = 7; // home pattern size
-    for (int i = 0; i < 2048; ++i)
-    {
-        if (cwd[i]==0)
-            break;
-
-        if (i < 6)
-        {
-            if (home_pattern[i] == cwd[i])
-                username_length++;
-            else
-                is_home_on_path = 0;
-
-        }
-    }
-
-    if (is_home_on_path == 1 && size_cwd > 1)
-    {
-        updated_path[0] = '~';
-        for (int j = 0; j < 2048; ++j)
-        {
-            if (cwd[j]==0)
-                break;
-            if ( j > username_length)
-                updated_path[j-username_length] = cwd[j];
-        }
-    }
-    print_path(updated_path);
-}
-
-
-
-
-
-int skipping_esccapes(const char *line, int i_line)
-{
-       while (line[i_line]==' ')
-        {
-            i_line++;
-        }
-    return i_line;
-}
+//simillar to printing path can't explai
 
 
 void read_input(char *buffer)
@@ -246,7 +305,7 @@ int execute(char * args[])
 
     }
     else if (pid == 0 && isInBackground == 1){
-        //don' do anything cz this is child process
+        //don't do anything cz this is child process
     }
 
     else
@@ -333,12 +392,12 @@ void run(void)
      * */
 
     int status = 1;
+    int is_command = 0;
     while (status >= 0)
     {
-        if (status == 1)
-            you_are_here(getuid());
+        print_current_path();
         char *line = malloc(BUFSIZE * sizeof(char));
-
+        //home_path();
         read_input(line);
 
         char * args [BUFSIZE];
@@ -350,11 +409,12 @@ void run(void)
         if (cmpstr(args[0],"cd"))
         {
             cd(args[1]);
-            status = 0;
+            is_command = 1;
         }
 
         else
         {
+            is_command = 0;
             status = execute(args);
         }
         free(line);//0x7fff33941160
@@ -371,7 +431,7 @@ int main(int argc, char** argv)
      * run the program
      * cleanup the program
      * */
-
+    getcwd(updated_path, sizeof(updated_path));
     run();
 
     return 0;
