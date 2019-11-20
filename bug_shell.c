@@ -240,7 +240,6 @@ void update_path(char * update_the_path)
                         updated_path[i] = 0;
                     else
                     {
-                        //updated_path[i] = 0;
                         break;
                     }
                 }
