@@ -90,8 +90,10 @@ char * mergestr(char *to, char *from)
     {
         result[j] = to[j];
     }
-    result[a_size]='/';
-
+    if(!(a_size == 1 && to[0]=='/'))
+        result[a_size]='/';
+    else
+        a_size--;
     for (int i = a_size; i < total; ++i)
     {
         result[i+1]=from[i-a_size];
@@ -200,7 +202,6 @@ void home_to_tilda() {
         {
             char new_path [BUFSIZE];
             new_path[0] = '~';
-            //new_path[1] = '/';
             int j = home_path_length;
             for (; j < 2048; ++j)
             {
@@ -239,7 +240,7 @@ void update_path(char * update_the_path)
                         updated_path[i] = 0;
                     else
                     {
-                        updated_path[i] = 0;
+                        //updated_path[i] = 0;
                         break;
                     }
                 }
